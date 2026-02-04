@@ -565,4 +565,3 @@ function simulateFailure() {
         document.getElementById('door-modal').addEventListener('click', (e) => {
             if(e.target === document.getElementById('door-modal')) closeModal();
         });
-    </script>
