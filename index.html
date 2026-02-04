@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DoorSync Unified | Access Control Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        gray: { 850: '#1f2937', 900: '#111827', 950: '#030712' },
+                        primary: { 400: '#22d3ee', 500: '#06b6d4', 600: '#0891b2' },
+                        danger: { 400: '#f87171', 500: '#ef4444' },
+                        success: { 400: '#4ade80', 500: '#22c55e' },
+                        warning: { 400: '#fbbf24', 500: '#f59e0b' }
+                    },
+                    fontFamily: {
+                        mono: ['Fira Code', 'monospace'],
+                        sans: ['Inter', 'sans-serif']
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-in': 'slideIn 0.3s ease-out',
+                        'fade-in': 'fadeIn 0.2s ease-out'
+                    },
+                    keyframes: {
+                        slideIn: {
+                            '0%': { transform: 'translateX(100%)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' }
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; }
+        .font-mono { font-family: 'Fira Code', monospace; }
+        
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        
+        .status-dot {
+            box-shadow: 0 0 12px currentColor;
+        }
+        
+        .building-card {
+            transition: all 0.3s ease;
+        }
+        .building-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .grid-18 {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+        
+        @media (max-width: 640px) {
+            .grid-18 { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 antialiased overflow-hidden h-screen">
+
+    <!-- Sidebar -->
+    <div class="fixed left-0 top-0 h-full w-64 bg-gray-900 border-r border-gray-800 z-50 flex flex-col">
+        <div class="p-6 border-b border-gray-800">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500 to-blue-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+                    <i class="fas fa-shield-alt text-white text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg tracking-tight">DoorSync</h1>
+                    <p class="text-xs text-gray-400">Unified Access Control</p>
+                </div>
+            </div>
+        </div>
+
+        <nav class="flex-1 p-4 space-y-2 overflow-y-auto scrollbar-hide">
+            <button onclick="switchView('dashboard')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors bg-primary-500/10 text-primary-400 border border-primary-500/20" data-view="dashboard">
+                <i class="fas fa-th-grid w-5"></i>
+                <span>Dashboard</span>
+                <span class="ml-auto text-xs bg-primary-500/20 px-2 py-0.5 rounded-full" id="nav-count">18</span>
+            </button>
+            
+            <button onclick="switchView('events')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors" data-view="events">
+                <i class="fas fa-stream w-5"></i>
+                <span>Sync Events</span>
+                <span class="ml-auto text-xs bg-warning-500/20 text-warning-400 px-2 py-0.5 rounded-full animate-pulse" id="pending-count">0</span>
+            </button>
+            
+            <button onclick="switchView('users')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors" data-view="users">
+                <i class="fas fa-users w-5"></i>
+                <span>Access Cards</span>
+            </button>
+            
+            <button onclick="switchView('logs')" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-gray-400 hover:bg-gray-800 hover:text-gray-200 transition-colors" data-view="logs">
+                <i class="fas fa-terminal w-5"></i>
+                <span>System Logs</span>
+            </button>
+        </nav>
+
+        <div class="p-4 border-t border-gray-800">
+            <div class="glass-panel rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-medium text-gray-400">System Health</span>
+                    <span class="status-dot w-2 h-2 rounded-full bg-success-500 status-dot"></span>
+                </div>
+                <div class="text-2xl font-bold text-white mb-1" id="global-uptime">99.9%</div>
+                <div class="text-xs text-gray-500">18/18 Buildings Online</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="ml-64 h-full flex flex-col">
+        <!-- Header -->
+        <header class="h-16 border-b border-gray-800 bg-gray-900/50 backdrop-blur flex items-center justify-between px-8 sticky top-0 z-40">
+            <div class="flex items-center gap-4">
+                <h2 class="text-xl font-semibold text-white" id="page-title">Dashboard Overview</h2>
+                <span class="px-3 py-1 rounded-full text-xs font-mono bg-gray-800 text-gray-400 border border-gray-700">
+                    <i class="fas fa-database mr-2"></i>PostgreSQL Primary
+                </span>
+            </div>
+            
+            <div class="flex items-center gap-4">
+                <button onclick="simulateFailure()" class="px-4 py-2 text-xs font-medium text-danger-400 hover:text-danger-300 transition-colors border border-danger-500/20 rounded-lg hover:bg-danger-500/10">
+                    <i class="fas fa-bug mr-2"></i>Simulate Failure
+                </button>
+                
+                <div class="relative">
+                    <button class="w-10 h-10 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center transition-colors relative">
+                        <i class="fas fa-bell text-gray-400"></i>
+                        <span class="absolute top-2 right-2 w-2 h-2 bg-danger-500 rounded-full animate-pulse"></span>
+                    </button>
+                </div>
+                
+                <div class="flex items-center gap-3 pl-4 border-l border-gray-800">
+                    <div class="text-right">
+                        <div class="text-sm font-medium text-white">Admin User</div>
+                        <div class="text-xs text-gray-500">Security Manager</div>
+                    </div>
+                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-gray-700 to-gray-600 flex items-center justify-center border border-gray-500">
+                        <i class="fas fa-user text-gray-300"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Content Area -->
+        <main class="flex-1 overflow-y-auto p-8 scrollbar-hide bg-gray-950 relative">
+            
+            <!-- View: Dashboard -->
+            <div id="view-dashboard" class="view-section space-y-6">
+                <!-- Stats Row -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <i class="fas fa-door-open text-6xl text-primary-500"></i>
+                        </div>
+                        <div class="text-sm text-gray-400 mb-1">Total Doors</div>
+                        <div class="text-3xl font-bold text-white mb-2" id="stat-total-doors">246</div>
+                        <div class="flex items-center gap-2 text-xs text-success-400">
+                            <i class="fas fa-arrow-up"></i>
+                            <span>Across 18 buildings</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <i class="fas fa-check-circle text-6xl text-success-500"></i>
+                        </div>
+                        <div class="text-sm text-gray-400 mb-1">Sync Status</div>
+                        <div class="text-3xl font-bold text-white mb-2" id="stat-sync-status">Real-time</div>
+                        <div class="flex items-center gap-2 text-xs text-success-400">
+                            <span class="w-2 h-2 rounded-full bg-success-500 animate-pulse"></span>
+                            <span>18 workers active</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <i class="fas fa-exclamation-triangle text-6xl text-warning-500"></i>
+                        </div>
+                        <div class="text-sm text-gray-400 mb-1">Pending Events</div>
+                        <div class="text-3xl font-bold text-white mb-2" id="stat-pending">0</div>
+                        <div class="flex items-center gap-2 text-xs text-gray-400">
+                            <span>In Outbox Queue</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-panel rounded-xl p-6 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <i class="fas fa-clock text-6xl text-primary-500"></i>
+                        </div>
+                        <div class="text-sm text-gray-400 mb-1">Avg Latency</div>
+                        <div class="text-3xl font-bold text-white mb-2" id="stat-latency">143<span class="text-lg text-gray-500 ml-1">ms</span></div>
+                        <div class="flex items-center gap-2 text-xs text-success-400">
+                            <i class="fas fa-check"></i>
+                            <span>Healthy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Buildings Grid -->
+                <div>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-lg font-semibold text-white">Building Zones</h3>
+                        <div class="flex gap-2">
+                            <button onclick="filterBuildings('all')" class="px-3 py-1.5 text-xs rounded-lg bg-primary-500/20 text-primary-400 border border-primary-500/30 hover:bg-primary-500/30 transition-colors active-filter" data-filter="all">All</button>
+                            <button onclick="filterBuildings('issue')" class="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 transition-colors" data-filter="issue">Issues</button>
+                            <button onclick="refreshAllBuildings()" class="px-3 py-1.5 text-xs rounded-lg bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700 transition-colors">
+                                <i class="fas fa-sync-alt mr-1"></i> Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="grid-18" id="buildings-grid">
+                        <!-- Generated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Events (Outbox Pattern Visualization) -->
+            <div id="view-events" class="view-section hidden space-y-6">
+                <div class="glass-panel rounded-xl p-6 border border-primary-500/20 bg-primary-500/5">
+                    <div class="flex items-start justify-between">
+                        <div>
+                            <h3 class="text-lg font-semibold text-primary-400 mb-2">Outbox Pattern Event Stream</h3>
+                            <p class="text-sm text-gray-400 max-w-2xl">
+                                Events are written atomically to PostgreSQL (source of truth) then asynchronously replicated to 18 SQL Server instances. 
+                                This ensures zero data loss even if target systems are offline.
+                            </p>
+                        </div>
+                        <div class="flex gap-3">
+                            <div class="text-center px-4 py-2 bg-gray-900 rounded-lg border border-gray-700">
+                                <div class="text-2xl font-bold text-white" id="event-rate">24</div>
+                                <div class="text-xs text-gray-500">events/min</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-xl overflow-hidden border border-gray-800">
+                    <div class="p-4 border-b border-gray-800 bg-gray-900/50 flex items-center justify-between">
+                        <div class="flex gap-4 text-sm">
+                            <button class="text-primary-400 font-medium border-b-2 border-primary-400 pb-4 -mb-4">Pending</button>
+                            <button class="text-gray-500 hover:text-gray-300 transition-colors">Processing</button>
+                            <button class="text-gray-500 hover:text-gray-300 transition-colors">Completed (24h)</button>
+                            <button class="text-gray-500 hover:text-gray-300 transition-colors">Dead Letter</button>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="text" placeholder="Search events..." class="bg-gray-950 border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-primary-500 transition-colors w-64">
+                            <button class="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-900 text-gray-400 font-medium">
+                                <tr>
+                                    <th class="p-4 font-mono text-xs">Event ID</th>
+                                    <th class="p-4">Building</th>
+                                    <th class="p-4">Operation</th>
+                                    <th class="p-4">Target Table</th>
+                                    <th class="p-4">Status</th>
+                                    <th class="p-4">Retries</th>
+                                    <th class="p-4">Timestamp</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="events-table-body" class="divide-y divide-gray-800">
+                                <!-- Generated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- View: Building Detail (Modal-like inline view) -->
+            <div id="view-building-detail" class="view-section hidden space-y-6">
+                <button onclick="switchView('dashboard')" class="mb-4 flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-arrow-left"></i>
+                    <span>Back to Dashboard</span>
+                </button>
+
+                <div class="flex items-start justify-between mb-6">
+                    <div>
+                        <div class="flex items-center gap-4 mb-2">
+                            <h2 class="text-3xl font-bold text-white" id="detail-building-name">Building A</h2>
+                            <span class="px-3 py-1 rounded-full text-xs font-medium bg-success-500/20 text-success-400 border border-success-500/30" id="detail-building-status">
+                                <i class="fas fa-check-circle mr-1"></i>Online
+                            </span>
+                        </div>
+                        <p class="text-gray-400 text-sm flex items-center gap-4">
+                            <span><i class="fas fa-map-marker-alt mr-2 text-gray-500"></i><span id="detail-address">123 Security Ave, Zone 1</span></span>
+                            <span class="font-mono text-xs bg-gray-800 px-2 py-1 rounded" id="detail-db">MSSQL-01 • Port 1433</span>
+                        </p>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="forceFullResync()" class="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary-500/20">
+                            <i class="fas fa-sync mr-2"></i>Force Full Resync
+                        </button>
+                        <button class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors border border-gray-700">
+                            <i class="fas fa-cog mr-2"></i>Settings
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-6 mb-6">
+                    <div class="glass-panel p-4 rounded-lg border border-gray-800">
+                        <div class="text-gray-400 text-xs mb-1">Total Doors</div>
+                        <div class="text-2xl font-bold text-white" id="detail-door-count">12</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-lg border border-gray-800">
+                        <div class="text-gray-400 text-xs mb-1">Active Alerts</div>
+                        <div class="text-2xl font-bold text-warning-400" id="detail-alert-count">0</div>
+                    </div>
+                    <div class="glass-panel p-4 rounded-lg border border-gray-800">
+                        <div class="text-gray-400 text-xs mb-1">Last Sync</div>
+                        <div class="text-2xl font-bold text-success-400" id="detail-last-sync">2s ago</div>
+                    </div>
+                </div>
+
+                <div class="glass-panel rounded-xl border border-gray-800 overflow-hidden">
+                    <div class="p-4 border-b border-gray-800 flex items-center justify-between bg-gray-900/30">
+                        <h3 class="font-semibold text-white">Doors in this Building</h3>
+                        <button onclick="showAddDoorModal()" class="px-3 py-1.5 bg-primary-600/20 text-primary-400 border border-primary-500/30 rounded-lg text-xs hover:bg-primary-600/30 transition-colors">
+                            <i class="fas fa-plus mr-1"></i>Add Door
+                        </button>
+                    </div>
+                    <table class="w-full text-sm text-left">
+                        <thead class="bg-gray-900 text-gray-400 text-xs uppercase">
+                            <tr>
+                                <th class="p-4">Door ID</th>
+                                <th class="p-4">Location</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4">Access Mode</th>
+                                <th class="p-4">Last Activity</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="doors-table-body" class="divide-y divide-gray-800">
+                            <!-- Generated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- View: Logs -->
+            <div id="view-logs" class="view-section hidden">
+                <div class="glass-panel rounded-xl border border-gray-800 bg-gray-900/50 font-mono text-sm p-4 h-[calc(100vh-200px)] overflow-y-auto" id="system-logs">
+                    <div class="space-y-2" id="log-entries">
+                        <div class="flex gap-3 text-gray-400">
+                            <span class="text-gray-600">[2024-01-28 14:23:01]</span>
+                            <span class="text-primary-400">INFO</span>
+                            <span>BuildingSyncWorker-07</span>
+                            <span class="text-gray-300">→ Processed batch of 3 events in 142ms</span>
+                        </div>
+                        <div class="flex gap-3 text-gray-400">
+                            <span class="text-gray-600">[2024-01-28 14:23:00]</span>
+                            <span class="text-primary-400">INFO</span>
+                            <span>OutboxPublisher</span>
+                            <span class="text-gray-300">→ New event generated: DOOR_ACCESS_UPDATE (Building 12)</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Toast Container -->
+            <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2"></div>
+        </main>
+    </div>
+
+    <!-- Edit Door Modal -->
+    <dialog id="door-modal" class="bg-transparent p-0 backdrop:bg-black/60 backdrop:backdrop-blur-sm">
+        <div class="bg-gray-900 border border-gray-700 rounded-xl shadow-2xl w-[500px] overflow-hidden">
+            <div class="p-6 border-b border-gray-800 flex justify-between items-center bg-gray-950">
+                <h3 class="text-lg font-semibold text-white">Edit Door Configuration</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-2">Door Hardware ID</label>
+                    <input type="text" id="modal-door-id" readonly class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-gray-500 font-mono text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-400 mb-2">Location Name</label>
+                    <input type="text" id="modal-location" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-primary-500 focus:outline-none transition-colors">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-2">Access Mode</label>
+                        <select id="modal-access" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-primary-500 focus:outline-none">
+                            <option value="card">Card Only</option>
+                            <option value="pin">PIN Only</option>
+                            <option value="card_pin">Card + PIN</option>
+                            <option value="biometric">Biometric</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-2">Schedule</label>
+                        <select class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-white focus:border-primary-500 focus:outline-none">
+                            <option>24/7 Access</option>
+                            <option>Business Hours</option>
+                            <option>Weekdays Only</option>
+                            <option>Custom...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="bg-gray-950 p-4 rounded-lg border border-gray-800">
+                    <div class="text-xs font-medium text-gray-400 mb-3">Quick Actions</div>
+                    <div class="flex gap-2">
+                        <button class="flex-1 py-2 bg-success-500/10 text-success-400 border border-success-500/20 rounded-lg text-xs hover:bg-success-500/20 transition-colors">
+                            <i class="fas fa-door-open mr-1"></i>Remote Unlock
+                        </button>
+                        <button class="flex-1 py-2 bg-danger-500/10 text-danger-400 border border-danger-500/20 rounded-lg text-xs hover:bg-danger-500/20 transition-colors">
+                            <i class="fas fa-ban mr-1"></i>Lock Down
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-gray-800 bg-gray-950 flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-400 hover:text-white text-sm transition-colors">Cancel</button>
+                <button onclick="saveDoorChanges()" class="px-6 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm font-medium transition-colors shadow-lg shadow-primary-500/20">
+                    Save Changes & Sync
+                </button>
+            </div>
+        </div>
+    </dialog>
+
+    <script>
+        // Data State
+        const buildings = Array.from({length: 18}, (_, i) => ({
+            id: i + 1,
+            name: `Building ${String.fromCharCode(65 + i)}`,
+            zone: `Zone ${i + 1}`,
+            address: `${100 + i} Security Blvd, Floor ${(i % 5) + 1}`,
+            status: Math.random() > 0.1 ? 'online' : 'syncing',
+            dbServer: `MSSQL-${String(i + 1).padStart(2, '0')}`,
+            doorCount: 12 + Math.floor(Math.random() * 8),
+            lastSync: Math.floor(Math.random() * 60),
+            latency: 100 + Math.floor(Math.random() * 100),
+            doors: Array.from({length: 12}, (_, j) => ({
+                id: `DR-${i+1}-${String(j+1).padStart(3, '0')}`,
+                location: ['Main Entrance', 'Lobby', 'Server Room', 'Executive Floor', 'Parking Garage', 'East Wing'][j % 6],
+                status: Math.random() > 0.2 ? 'locked' : 'unlocked',
+                mode: ['card', 'pin', 'card_pin', 'biometric'][Math.floor(Math.random() * 4)],
+                lastActivity: '2 mins ago'
+            }))
+        }));
+
+        let currentBuilding = null;
+        let pendingEvents = [];
+        let eventIdCounter = 1000;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            renderBuildings();
+            startSimulation();
+        });
+
+        // Navigation
+        function switchView(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-primary-500/10', 'text-primary-400', 'border', 'border-primary-500/20');
+                btn.classList.add('text-gray-400');
+                if(btn.dataset.view === viewName) {
+                    btn.classList.remove('text-gray-400');
+                    btn.classList.add('bg-primary-500/10', 'text-primary-400', 'border', 'border-primary-500/20');
+                }
+            });
+
+            if(viewName === 'events') renderEvents();
+            if(viewName === 'building-detail') renderBuildingDetail();
+            
+            const titles = {
+                'dashboard': 'Dashboard Overview',
+                'events': 'Sync Event Queue',
+                'users': 'Access Card Management',
+                'logs': 'System Logs',
+                'building-detail': 'Building Management'
+            };
+            document.getElementById('page-title').textContent = titles[viewName] || 'Dashboard';
+        }
+
+        // Building Grid
+        function renderBuildings() {
+            const grid = document.getElementById('buildings-grid');
+            grid.innerHTML = buildings.map(b => {
+                const statusColors = {
+                    online: 'bg-success-500',
+                    syncing: 'bg-warning-500 animate-pulse',
+                    error: 'bg-danger-500'
+                };
+                const statusText = {
+                    online: 'Online',
+                    syncing: 'Syncing...',
+                    error: 'Connection Error'
+                };
+                
+                return `
+                    <div class="building-card glass-panel rounded-xl p-5 border border-gray-800 cursor-pointer group relative overflow-hidden" onclick="openBuilding(${b.id})">
+                        <div class="absolute top-0 left-0 w-1 h-full ${b.status === 'online' ? 'bg-success-500' : b.status === 'syncing' ? 'bg-warning-500' : 'bg-danger-500'}"></div>
+                        
+                        <div class="flex justify-between items-start mb-4 pl-3">
+                            <div>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <h4 class="font-bold text-white text-lg">${b.name}</h4>
+                                    <span class="text-xs text-gray-500 font-mono">${b.dbServer}</span>
+                                </div>
+                                <div class="text-xs text-gray-400">${b.address}</div>
+                            </div>
+                            <div class="flex flex-col items-end gap-1">
+                                <span class="status-dot w-2.5 h-2.5 rounded-full ${statusColors[b.status]}"></span>
+                                <span class="text-[10px] uppercase font-bold tracking-wider ${b.status === 'online' ? 'text-success-400' : b.status === 'syncing' ? 'text-warning-400' : 'text-danger-400'}">${statusText[b.status]}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-3 mb-4 pl-3">
+                            <div class="bg-gray-950/50 rounded-lg p-2 border border-gray-800">
+                                <div class="text-[10px] text-gray-500 uppercase">Doors</div>
+                                <div class="text-lg font-semibold text-white">${b.doorCount}</div>
+                            </div>
+                            <div class="bg-gray-950/50 rounded-lg p-2 border border-gray-800">
+                                <div class="text-[10px] text-gray-500 uppercase">Latency</div>
+                                <div class="text-lg font-semibold text-white">${b.latency}<span class="text-xs text-gray-500 ml-0.5">ms</span></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between text-xs text-gray-500 pl-3 border-t border-gray-800 pt-3">
+                            <span><i class="fas fa-clock mr-1"></i>Last sync: ${b.lastSync}s ago</span>
+                            <span class="group-hover:text-primary-400 transition-colors"><i class="fas fa-chevron-right"></i></span>
+                        </div>
+                        
+                        ${b.status === 'syncing' ? '<div class="absolute bottom-0 left-0 h-0.5 bg-warning-500 animate-[shimmer_2s_infinite] w-full"></div>' : ''}
+                    </div>
+                `;
+            }).join('');
+            
+            document.getElementById('nav-count').textContent = buildings.filter(b => b.status === 'online').length;
+        }
+
+        function filterBuildings(type) {
+            document.querySelectorAll('[data-filter]').forEach(btn => {
+                btn.classList.remove('bg-primary-500/20', 'text-primary-400', 'border-primary-500/30');
+                btn.classList.add('bg-gray-800', 'text-gray-400', 'border-gray-700');
+            });
+            event.target.classList.remove('bg-gray-800', 'text-gray-400', 'border-gray-700');
+            event.target.classList.add('bg-primary-500/20', 'text-primary-400', 'border-primary-500/30');
+            
+            // Simple filter logic for demo
+            if(type === 'issue') {
+                buildings.forEach(b => b.hidden = b.status === 'online');
+            } else {
+                buildings.forEach(b => b.hidden = false);
+            }
+            renderBuildings();
+        }
+
+        // Building Detail View
+        function openBuilding(id) {
+            currentBuilding = buildings.find(b => b.id === id);
+            switchView('building-detail');
+        }
+
+        function renderBuildingDetail() {
+            if(!currentBuilding) return;
+            
+            document.getElementById('detail-building-name').textContent = currentBuilding.name;
+            document.getElementById('detail-address').textContent = currentBuilding.address;
+            document.getElementById('detail-db').textContent = `${currentBuilding.dbServer} • Port 1433`;
+            document.getElementById('detail-door-count').textContent = currentBuilding.doorCount;
+            
+            const tbody = document.getElementById('doors-table-body');
+            tbody.innerHTML = currentBuilding.doors.map(door => `
+                <tr class="hover:bg-gray-900/50 transition-colors group">
+                    <td class="p-4 font-mono text-xs text-primary-400">${door.id}</td>
+                    <td class="p-4 text-white">${door.location}</td>
+                    <td class="p-4">
+                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${door.status === 'locked' ? 'bg-success-500/10 text-success-400 border border-success-500/20' : 'bg-warning-500/10 text-warning-400 border border-warning-500/20'}">
+                            <span class="w-1.5 h-1.5 rounded-full ${door.status === 'locked' ? 'bg-success-500' : 'bg-warning-500'}"></span>
+                            ${door.status === 'locked' ? 'Locked' : 'Unlocked'}
+                        </span>
+                    </td>
+                    <td class="p-4 text-gray-300 text-xs uppercase">${door.mode.replace('_', '+')}</td>
+                    <td class="p-4 text-gray-500 text-xs">${door.lastActivity}</td>
+                    <td class="p-4 text-right">
+                        <button onclick="editDoor('${door.id}')" class="text-gray-400 hover:text-primary-400 transition-colors p-2 hover:bg-primary-500/10 rounded-lg">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Door Edit Modal
+        function editDoor(doorId) {
+            const door = currentBuilding.doors.find(d => d.id === doorId);
+            document.getElementById('modal-door-id').value = doorId;
+            document.getElementById('modal-location').value = door.location;
+            document.getElementById('modal-access').value = door.mode;
+            document.getElementById('door-modal').showModal();
+        }
+
+        function closeModal() {
+            document.getElementById('door-modal').close();
+        }
+
+        function saveDoorChanges() {
+            closeModal();
+            createEvent(currentBuilding.id, 'DOOR_CONFIG_UPDATE', `Door ${document.getElementById('modal-door-id').value} updated`);
+            showToast('Changes saved & sync initiated', 'success');
+        }
+
+        // Events / Outbox
+        function createEvent(buildingId, operation, description) {
+            const event = {
+                id: `evt-${eventIdCounter++}`,
+                buildingId,
+                operation,
+                table: 'Doors',
+                status: 'pending',
+                retries: 0,
+                timestamp: new Date().toLocaleTimeString(),
+                description
+            };
+            pendingEvents.unshift(event);
+            updatePendingCount();
+            
+            // Simulate processing
+            setTimeout(() => {
+                event.status = 'processing';
+                addLog(`BuildingSyncWorker-${String(buildingId).padStart(2, '0')}`, `Processing event ${event.id} (${operation})`);
+                
+                setTimeout(() => {
+                    event.status = Math.random() > 0.9 ? 'failed' : 'completed';
+                    if(event.status === 'failed') event.retries++;
+                    updatePendingCount();
+                    addLog(`BuildingSyncWorker-${String(buildingId).padStart(2, '0')}`, `Event ${event.id} ${event.status}`);
+                }, 1500);
+            }, 500);
+        }
+
+        function updatePendingCount() {
+            const count = pendingEvents.filter(e => e.status === 'pending').length;
+            document.getElementById('pending-count').textContent = count;
+            document.getElementById('stat-pending').textContent = count;
+        }
+
+        function renderEvents() {
+            const tbody = document.getElementById('events-table-body');
+            tbody.innerHTML = pendingEvents.slice(0, 20).map(evt => {
+                const statusColors = {
+                    pending: 'bg-warning-500/10 text-warning-400 border-warning-500/20',
+                    processing: 'bg-primary-500/10 text-primary-400 border-primary-500/20 animate-pulse',
+                    completed: 'bg-success-500/10 text-success-400 border-success-500/20',
+                    failed: 'bg-danger-500/10 text-danger-400 border-danger-500/20'
+                };
+                
+                return `
+                    <tr class="border-b border-gray-800/50 hover:bg-gray-900/30 transition-colors">
+                        <td class="p-4 font-mono text-xs text-gray-500">${evt.id}</td>
+                        <td class="p-4 text-white">Building ${String.fromCharCode(64 + evt.buildingId)}</td>
+                        <td class="p-4">
+                            <span class="font-mono text-xs ${evt.operation.includes('UPDATE') ? 'text-primary-400' : evt.operation.includes('DELETE') ? 'text-danger-400' : 'text-success-400'}">
+                                ${evt.operation}
+                            </span>
+                        </td>
+                        <td class="p-4 text-gray-400 text-xs">${evt.table}</td>
+                        <td class="p-4">
+                            <span class="px-2 py-1 rounded-full text-xs border ${statusColors[evt.status]}">${evt.status}</span>
+                        </td>
+                        <td class="p-4 text-gray-500 text-xs">${evt.retries}/3</td>
+                        <td class="p-4 text-gray-500 text-xs font-mono">${evt.timestamp}</td>
+                        <td class="p-4 text-right">
+                            ${evt.status === 'failed' ? '<button class="text-primary-400 hover:text-primary-300 text-xs">Retry</button>' : '<span class="text-gray-600 text-xs">-</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Logs
+        function addLog(source, message) {
+            const container = document.getElementById('log-entries');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'flex gap-3 text-gray-400 animate-fade-in';
+            entry.innerHTML = `
+                <span class="text-gray-600">[${time}]</span>
+                <span class="text-primary-400">INFO</span>
+                <span class="text-gray-500 w-32">${source}</span>
+                <span class="text-gray-300">→ ${message}</span>
+            `;
+            container.insertBefore(entry, container.firstChild);
+        }
+
+        // Simulation
+        function startSimulation() {
+            // Random sync updates
+            setInterval(() => {
+                buildings.forEach(b => {
+                    if(Math.random() > 0.95) {
+                        b.lastSync = 0;
+                        b.status = 'syncing';
+                        setTimeout(() => {
+                            b.status = 'online';
+                            b.latency = 100 + Math.floor(Math.random() * 100);
+                            renderBuildings();
+                        }, 2000);
+                    } else {
+                        b.lastSync++;
+                    }
+                });
+                renderBuildings();
+            }, 3000);
+
+            // Random events
+            setInterval(() => {
+                if(Math.random() > 0.7) {
+                    const bId = Math.floor(Math.random() * 18) + 1;
+                    const ops = ['DOOR_ACCESS_UPDATE', 'SCHEDULE_CHANGE', 'CARD_PROVISION', 'CONFIG_UPDATE'];
+                    createEvent(bId, ops[Math.floor(Math.random() * ops.length)], 'Auto-generated');
+                }
+            }, 4000);
+
+            // Update stats
+            setInterval(() => {
+                document.getElementById('stat-latency').innerHTML = `${120 + Math.floor(Math.random() * 50)}<span class="text-lg text-gray-500 ml-1">ms</span>`;
+                document.getElementById('event-rate').textContent = 20 + Math.floor(Math.random() * 10);
+            }, 2000);
+        }
+
+        function simulateFailure() {
+            const targetId = Math.floor(Math.random() * 18) + 1;
+            buildings.find(b => b.id === targetId).status = 'error';
+            renderBuildings();
+            showToast(`Building ${String.fromCharCode(64 + targetId)} connection failed`, 'error');
+        }
+
+        function forceFullResync() {
+            showToast('Full resync initiated for ' + currentBuilding.name, 'info');
+            document.getElementById('detail-last-sync').textContent = 'Syncing...';
+            setTimeout(() => {
+                document.getElementById('detail-last-sync').textContent = 'Just now';
+                showToast('Resync completed successfully', 'success');
+            }, 3000);
+        }
+
+        function refreshAllBuildings() {
+            showToast('Refreshing all building statuses...', 'info');
+            setTimeout(() => renderBuildings(), 1000);
+        }
+
+        // Toast notifications
+        function showToast(message, type = 'info') {
+            const colors = {
+                success: 'border-success-500/30 bg-success-500/10 text-success-400',
+                error: 'border-danger-500/30 bg-danger-500/10 text-danger-400',
+                info: 'border-primary-500/30 bg-primary-500/10 text-primary-400'
+            };
+            
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `px-4 py-3 rounded-lg border ${colors[type]} shadow-xl backdrop-blur flex items-center gap-3 animate-slide-in min-w-[300px]`;
+            toast.innerHTML = `
+                <i class="fas ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i>
+                <span class="text-sm font-medium text-gray-200">${message}</span>
+            `;
+            
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(100%)';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Close modal on backdrop click
+        document.getElementById('door-modal').addEventListener('click', (e) => {
+            if(e.target === document.getElementById('door-modal')) closeModal();
+        });
+    </script>
+</body>
+</html>
